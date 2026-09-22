@@ -1,0 +1,22 @@
+name = "nivat"
+defaultTargets = ["Nivat"]
+
+# `autoImplicit` 默认开启，会把**拼错的标识符**悄悄变成一个全称量化的隐式变量，
+# 于是拼错假设名的定理照样编译通过，只是陈述被弱化成了别的东西。本项目的目的正是
+# 排除这种"证出空话"的失效模式（见 `Nivat/Sanity.lean`），故关掉它。
+# Mathlib 对自身文件也关闭此选项，但该设置不会传递到下游项目。
+[leanOptions]
+autoImplicit = false
+relaxedAutoImplicit = false
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+
+[[lean_lib]]
+name = "Nivat"
+
+# Eliashberg 项目（task-577）：Eliashberg 临界温度论文的 Lean 形式化。
+# 独立于 Nivat 库：只依赖 mathlib，不 import Nivat。
+[[lean_lib]]
+name = "Eliashberg"

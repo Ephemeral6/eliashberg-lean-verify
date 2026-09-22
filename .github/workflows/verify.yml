@@ -1,0 +1,118 @@
+name: verify-eliashberg
+
+# 目的：在一台干净的第三方机器上，从打包的源码 + 锁定的依赖 rev 重建
+# Eliashberg 库，并复跑公理审计。每一道闸门单独取 rc，不经管道，
+# 避免退出码被 tail/head 吃掉。
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 腾出磁盘（mathlib oleans 约 5-6 GB）
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          df -h /
+
+      - name: 记录声称的工具链与依赖
+        run: |
+          echo "== lean-toolchain =="; cat lean-toolchain
+          echo "== mathlib rev (manifest) =="
+          grep -A1 '"name": "mathlib"' lake-manifest.json || true
+          grep -B6 '"name": "mathlib"' lake-manifest.json | grep '"rev"'
+
+      - name: 安装 elan + 锁定的工具链
+        run: |
+          curl -sSfL https://github.com/leanprover/elan/releases/download/v4.0.0/elan-x86_64-unknown-linux-gnu.tar.gz \
+            | tar xz
+          ./elan-init -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> $GITHUB_PATH
+
+      - name: 版本落盘
+        run: |
+          elan --version
+          lake --version
+          lean --version
+
+      # ---- 闸门 0：源码里不得有 sorry / admit / 自设 axiom / native_decide ----
+      - name: 闸门0 源码洁净性
+        run: |
+          set -o pipefail
+          if grep -rnE 'sorry|admit|^axiom |native_decide' Eliashberg/ Eliashberg.lean; then
+            echo "GATE0 FAIL: 发现 sorry/admit/axiom/native_decide"; exit 1
+          fi
+          echo "GATE0 PASS: 无命中"
+          echo "模块数 = $(ls Eliashberg/*.lean | wc -l)"
+          echo "行数   = $(cat Eliashberg/*.lean Eliashberg.lean | wc -l)"
+
+      - name: 取 mathlib 缓存（按 manifest 锁定的 rev）
+        run: |
+          lake exe cache get
+          rc=$?
+          echo "cache_get_rc=$rc"
+          test $rc -eq 0
+
+      # ---- 闸门 1：真构建 ----
+      - name: 闸门1 lake build Eliashberg
+        run: |
+          lake build Eliashberg > build-log.txt 2>&1
+          rc=$?
+          echo "BUILD_RC=$rc"
+          tail -30 build-log.txt
+          test $rc -eq 0
+
+      # ---- 闸门 2：全库公理审计 ----
+      - name: 闸门2 AxiomAudit
+        run: |
+          lake env lean audit/AxiomAudit.lean > axiom-audit.txt 2>&1
+          rc=$?
+          echo "AXIOM_RC=$rc"
+          cat axiom-audit.txt
+          test $rc -eq 0
+          grep -q 'NONSTANDARD_COUNT 0' axiom-audit.txt || { echo "GATE2 FAIL: 存在非标准公理"; exit 1; }
+          echo "GATE2 PASS"
+
+      # ---- 闸门 3：非空性（点质量 δ₁ 实例化主定理，排除假设矛盾导致的空真） ----
+      - name: 闸门3 StmtCheck2 非空性
+        run: |
+          lake env lean audit/StmtCheck2.lean > stmtcheck2.txt 2>&1
+          rc=$?
+          echo "STMTCHECK2_RC=$rc"
+          cat stmtcheck2.txt
+          test $rc -eq 0
+
+      # ---- 闸门 4：主定理陈述打印（供人读，核对是否对应论文命题） ----
+      - name: 闸门4 StmtCheck 陈述打印
+        run: |
+          lake env lean audit/StmtCheck.lean > stmtcheck.txt 2>&1
+          rc=$?
+          echo "STMTCHECK_RC=$rc"
+          cat stmtcheck.txt
+          test $rc -eq 0
+
+      - name: 闸门5 DiracBridge
+        run: |
+          lake env lean audit/DiracBridge.lean > diracbridge.txt 2>&1
+          rc=$?
+          echo "DIRAC_RC=$rc"
+          cat diracbridge.txt
+          test $rc -eq 0
+
+      - name: 上传全部产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-outputs
+          path: |
+            build-log.txt
+            axiom-audit.txt
+            stmtcheck.txt
+            stmtcheck2.txt
+            diracbridge.txt
