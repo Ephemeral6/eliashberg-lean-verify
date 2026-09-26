@@ -3,6 +3,21 @@
 打包日期：2026-09-22。对象：论文 *The critical temperature of the linearised Eliashberg
 equations: existence, uniqueness, and the extremality of the Einstein spectrum*（v3，31 页）。
 
+> **先读这条：本文件描述的是本机的完整打包目录，不等于这个 git 仓库的内容。**
+> 下面「目录」一节列出的 `lean/`、`numerics/`、`paper/`、`audit/*-output.txt`
+> 等，**大部分没有推进本仓库**。本仓库实际追踪的是：
+>
+> - `Eliashberg.lean` 与 `Eliashberg/`（44 个模块，放在仓库根而非 `lean/` 下）；
+> - `lakefile.toml`、`lake-manifest.json`、`lean-toolchain`（重建所需的全部锁定）；
+> - `audit/*.lean`（6 个审计脚本；它们的输出不入库，由 CI 每次重新生成并作为
+>   artifact 上传）；
+> - `.github/workflows/verify.yml`（干净机器上的 7 道闸门）；
+> - `00-覆盖对照表.md`、`01-形式化进展.md`、本 `README.md`。
+>
+> 换言之：**重建与复核所需的东西是齐的**（源码 + 锁定 + 审计脚本 + CI），
+> 缺的是过程性留档与数值镜像，那些留在原工作区。
+> 用 `git ls-files` 看权威清单，不要照「目录」一节去找文件。
+
 ## 一句话结论
 
 **论文中一切被论文自己陈述为定理的命题都已在 Lean 4 + mathlib 中证明。**
