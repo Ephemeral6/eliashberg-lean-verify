@@ -5,6 +5,7 @@ import Eliashberg.Basic
 import Eliashberg.CertD
 import Eliashberg.Certificates
 import Eliashberg.Compact
+import Eliashberg.DiracBridge
 import Eliashberg.Discrete
 import Eliashberg.ConeFinite
 import Eliashberg.Corollaries

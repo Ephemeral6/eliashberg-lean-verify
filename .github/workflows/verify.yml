@@ -89,7 +89,15 @@ jobs:
           cat axiom-audit.txt
           test "$rc" -eq 0
           grep -q 'NONSTANDARD_COUNT 0' axiom-audit.txt
-          echo "GATE2 PASS"
+          # 孤儿模块判据：审计覆盖的模块数必须等于 Eliashberg/ 下的源文件数。
+          # lake build 不会碰根文件 import 链之外的文件，却照样报成功——
+          # 这条把「文件存在」与「被编译且被审计」钉成同一个数。
+          n=$(ls Eliashberg/*.lean | wc -l | tr -d ' ')
+          if ! grep -q "CHECKED modules=$n " axiom-audit.txt; then
+            echo "GATE2 FAIL: 审计覆盖模块数 ≠ 源文件数 $n（孤儿模块，或有文件未被根文件 import）"
+            exit 1
+          fi
+          echo "GATE2 PASS: 覆盖模块数 = 源文件数 = $n"
 
       - name: 闸门3 StmtCheck2 非空性（点质量 δ₁ 实例化主定理）
         run: |
@@ -111,15 +119,16 @@ jobs:
           cat stmtcheck.txt
           test "$rc" -eq 0
 
-      - name: 闸门5 DiracBridge
+      - name: 闸门5 DiracCheck（Theorem B 等号情形必须住在库内）
         run: |
           set +e
-          lake env lean audit/DiracBridge.lean > diracbridge.txt 2>&1
+          lake env lean audit/DiracCheck.lean > diracbridge.txt 2>&1
           rc=$?
           set -e
           echo "DIRAC_RC=$rc"
           cat diracbridge.txt
           test "$rc" -eq 0
+          grep -q 'DIRAC_BRIDGE_IN_LIBRARY ok' diracbridge.txt
 
       - name: 上传全部产物
         if: always()
