@@ -130,6 +130,19 @@ jobs:
           test "$rc" -eq 0
           grep -q 'DIRAC_BRIDGE_IN_LIBRARY ok' diracbridge.txt
 
+      - name: 闸门6 DepCheck（无条件主定理不得依赖 Conjecture 3.1）
+        run: |
+          set +e
+          lake env lean audit/DepCheck.lean > depcheck.txt 2>&1
+          rc=$?
+          set -e
+          echo "DEPCHECK_RC=$rc"
+          cat depcheck.txt
+          test "$rc" -eq 0
+          grep -q 'UNCONDITIONAL_MAIN_THEOREMS ok' depcheck.txt
+          # 反向检验：桥定理必须确实依赖猜想，否则闸门在空转
+          grep -q '反向检验通过' depcheck.txt
+
       - name: 上传全部产物
         if: always()
         uses: actions/upload-artifact@v4
@@ -139,6 +152,7 @@ jobs:
             build-log.txt
             axiom-audit.txt
             stmtcheck.txt
+            depcheck.txt
             stmtcheck2.txt
             diracbridge.txt
           if-no-files-found: warn
